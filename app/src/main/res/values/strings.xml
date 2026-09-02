@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">alf</string>
+    <string name="channel_name">Dinleme</string>
+    <string name="channel_description">alf mikrofonu dinlerken görünür.</string>
+    <string name="status_stopped">Durduruldu</string>
+    <string name="status_starting">Başlatılıyor…</string>
+    <string name="status_listening">Dinliyor</string>
+    <string name="status_awake">Uyandı, komut bekliyor</string>
+    <string name="status_no_permission">Mikrofon izni yok</string>
+    <string name="status_no_voice">Türkçe ses paketi yok</string>
+    <string name="status_building">Şablonlar hazırlanıyor…</string>
+    <string name="action_start">Başlat</string>
+    <string name="action_stop">Durdur</string>
+    <string name="action_rebuild">Şablonları yeniden üret</string>
+</resources>

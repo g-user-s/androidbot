@@ -1,10 +1,22 @@
 [versions]
+agp = "8.7.3"
 kotlin = "2.1.20"
 coroutines = "1.10.1"
+androidxCore = "1.13.1"
 jvmTarget = "17"
+minSdk = "29"
+targetSdk = "34"
+compileSdk = "34"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# Declared here but never applied at the root: applying an Android plugin project-wide would make
+# the SDK a hard requirement for the JVM modules too.
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
