@@ -18,3 +18,4 @@ rootProject.name = "alf"
 
 include(":domain:assistant")
 include(":data:nlu")
+include(":data:dsp")
