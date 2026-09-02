@@ -50,7 +50,9 @@ data class UtterancePattern(
     }
 
     companion object {
-        private val SLOT_RE = Regex("""\{(\w+)}""")
+        // Escape both braces explicitly. The desktop JDK accepts a bare closing brace here,
+        // while Android 10's regex engine rejects it during class initialisation.
+        private val SLOT_RE = Regex("""\{(\w+)\}""")
     }
 }
 
