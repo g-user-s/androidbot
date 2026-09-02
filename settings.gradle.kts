@@ -20,19 +20,23 @@ include(":domain:assistant")
 include(":data:nlu")
 include(":data:dsp")
 
-// The Android modules need an SDK installed; the modules above do not. Including them only when
-// one is present keeps the core buildable and testable anywhere — a container without the SDK,
-// a reviewer's laptop — instead of making an Android toolchain a prerequisite for running unit
-// tests. CI's android job sets ANDROID_HOME and asks for the Android tasks by name, so a missing
-// SDK there fails the job rather than quietly skipping the compile.
-val androidSdkPresent = sequenceOf("ANDROID_HOME", "ANDROID_SDK_ROOT")
-    .any { !System.getenv(it).isNullOrBlank() } || file("local.properties").exists()
+// The Android modules need an SDK installed; the modules above do not. Including them only on
+// request keeps the core buildable and testable anywhere — a container without the SDK, a
+// reviewer's laptop — instead of making an Android toolchain a prerequisite for running unit
+// tests. CI's android job passes -Palf.android=true and asks for the Android tasks by name, so a
+// broken Android build fails that job rather than being quietly skipped.
+//
+// An environment variable would be the obvious switch and is the wrong one: GitHub's runner
+// images ship an Android SDK, so ANDROID_HOME is set even on the job that is meant to prove the
+// core builds without one.
+val androidRequested = startParameter.projectProperties["alf.android"]?.toBoolean() == true
+val localSdkConfigured = file("local.properties").exists()
 
-if (androidSdkPresent) {
+if (androidRequested || localSdkConfigured) {
     include(":data:audio")
     include(":app")
 } else {
     gradle.rootProject {
-        logger.lifecycle("No Android SDK found — configuring the JVM core only.")
+        logger.lifecycle("Android modules skipped — pass -Palf.android=true to include them.")
     }
 }

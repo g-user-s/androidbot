@@ -15,7 +15,6 @@ androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 # Declared here but never applied at the root: applying an Android plugin project-wide would make
 # the SDK a hard requirement for the JVM modules too.
 android-application = { id = "com.android.application", version.ref = "agp" }

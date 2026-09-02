@@ -2,7 +2,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
+    // Applied without a version: the root project already puts the Kotlin plugin on the
+    // build classpath, and asking for a version again fails the compatibility check.
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -17,6 +19,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    sourceSets["main"].java.srcDirs("src/main/kotlin")
 }
 
 kotlin {

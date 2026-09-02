@@ -107,8 +107,9 @@ class AlfService : Service() {
         }
 
         val speech = TurkishTts(this).also { tts = it }
-        val status = speech.start()
-        if (status == TurkishTts.Status.Unavailable) {
+        // MissingVoice fails too: without a Turkish voice the templates would be synthesised in
+        // whatever language the default voice speaks, which is worse than not starting.
+        if (speech.start() != TurkishTts.Status.Ready) {
             fail(getString(R.string.status_no_voice))
             return
         }

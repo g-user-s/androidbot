@@ -19,8 +19,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # No Android SDK on this job on purpose: it proves the core still builds and tests without
-      # one, which is what keeps unit tests runnable anywhere.
+      # Without -Palf.android this configures the JVM modules only, which is what keeps unit
+      # tests runnable on a machine with no Android toolchain.
       - name: Test
         run: ./gradlew --no-daemon test
 
@@ -43,18 +43,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Sets ANDROID_HOME for the steps below, which is what makes settings.gradle.kts include
-      # the Android modules. Asking for :app:assembleDebug by name means a missing SDK fails the
-      # job instead of silently building nothing.
+      # Installs the SDK. -Palf.android=true below is what pulls the Android modules into the
+      # build; asking for :app:assembleDebug by name means a missing module fails the job instead
+      # of silently building nothing.
       - uses: android-actions/setup-android@v3
 
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Assemble
-        run: ./gradlew --no-daemon :data:audio:assembleDebug :app:assembleDebug
+        run: ./gradlew --no-daemon -Palf.android=true :data:audio:assembleDebug :app:assembleDebug
 
       - name: Lint
-        run: ./gradlew --no-daemon :app:lintDebug
+        run: ./gradlew --no-daemon -Palf.android=true :app:lintDebug
 
       - name: Publish lint report
         if: always()

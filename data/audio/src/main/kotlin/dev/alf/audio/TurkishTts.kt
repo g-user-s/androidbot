@@ -91,7 +91,8 @@ class TurkishTts(private val context: Context) {
 
     suspend fun synthesizeToFile(text: String, target: File, voice: Voice? = null): Boolean =
         withUtterance { tts, id ->
-            if (voice != null) tts.voice = voice
+            // setVoice returns an int, so it is not a Kotlin property.
+            if (voice != null) tts.setVoice(voice)
             tts.synthesizeToFile(text, Bundle(), target, id)
         }
 
