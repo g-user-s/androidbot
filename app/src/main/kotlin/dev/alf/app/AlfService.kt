@@ -108,6 +108,7 @@ class AlfService : Service() {
         }
 
         if (listeningJob?.isActive != true) {
+            setPhase(AlfState.Phase.Starting)
             listeningJob = scope.launch { listen() }
         }
         return START_STICKY
@@ -322,8 +323,15 @@ class AlfService : Service() {
     }
 
     private fun logRankings(diagnostics: PhraseMatcher, features: FeatureSequence) {
-        val ranked = diagnostics.rank(features).take(MatcherTuning.RANKINGS_LOGGED)
-        Log.d(TAG, "capture ranked: " + ranked.joinToString { "${it.first}=%.3f".format(it.second) })
+        val all = diagnostics.rank(features)
+        val ranked = all.take(MatcherTuning.RANKINGS_LOGGED)
+        val wake = all.firstOrNull { it.first == SkillCatalog.WAKE_WORD }?.second
+        val wakeScore = wake?.let { "%.3f".format(it) } ?: "missing"
+        Log.d(
+            TAG,
+            "capture wake=$wakeScore ranked: " +
+                ranked.joinToString { "${it.first}=%.3f".format(it.second) },
+        )
     }
 
     private fun templatesFile() = File(filesDir, "templates.alf")

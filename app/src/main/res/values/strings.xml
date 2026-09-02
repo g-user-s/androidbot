@@ -5,8 +5,9 @@
     <string name="channel_description">alf mikrofonu dinlerken görünür.</string>
     <string name="status_stopped">Durduruldu</string>
     <string name="status_starting">Başlatılıyor…</string>
-    <string name="status_listening">Dinliyor</string>
-    <string name="status_awake">Uyandı, komut bekliyor</string>
+    <string name="status_listening">Dinliyor…</string>
+    <string name="status_awake">Komut bekliyor…</string>
+    <string name="status_failed">Bir sorun oluştu</string>
     <string name="status_no_permission">Mikrofon izni yok</string>
     <string name="status_no_voice">Türkçe ses paketi yok</string>
     <string name="status_building">Şablonlar hazırlanıyor…</string>
@@ -14,6 +15,8 @@
     <string name="action_stop">Durdur</string>
     <string name="action_rebuild">Şablonları yeniden üret</string>
     <string name="action_save">Ayarları kaydet</string>
+    <string name="action_close">Ana ekrana dön</string>
+    <string name="settings_title">Ayarlar ve kontroller</string>
     <string name="hint_api_key">Gemini API anahtarı</string>
     <string name="hint_models">Model uç noktaları, satır başına bir tane (boşsa varsayılanlar)</string>
     <string name="hint_city">Şehir (hava durumu için)</string>
