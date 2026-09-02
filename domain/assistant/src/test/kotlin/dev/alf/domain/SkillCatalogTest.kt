@@ -46,7 +46,8 @@ class SkillCatalogTest {
                 SkillCatalog.Ids.WEATHER_NOW,
                 SkillCatalog.Ids.WEATHER_TOMORROW,
                 SkillCatalog.Ids.NEWS_HEADLINES,
-                SkillCatalog.Ids.EXCHANGE_RATE,
+                SkillCatalog.Ids.MARKET_QUOTE,
+                SkillCatalog.Ids.MARKET_SUMMARY,
             ),
             networked,
         )

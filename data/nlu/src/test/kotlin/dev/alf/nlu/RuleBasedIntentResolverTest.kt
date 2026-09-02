@@ -80,11 +80,25 @@ class RuleBasedIntentResolverTest {
     }
 
     @Test
-    fun `currency slot maps to a code`() = runBlocking {
-        val intent = assertNotNull(resolver.resolve("dolar kaç"))
+    fun `instrument slot maps to a feed symbol`() = runBlocking {
+        val dollar = assertNotNull(resolver.resolve("dolar kaç"))
+        assertEquals(SkillCatalog.Ids.MARKET_QUOTE, dollar.skillId)
+        assertEquals("USDTRY", dollar.params["symbol"])
 
-        assertEquals(SkillCatalog.Ids.EXCHANGE_RATE, intent.skillId)
-        assertEquals("USD", intent.params["currency"])
+        val gold = assertNotNull(resolver.resolve("gram altın ne kadar oldu"))
+        assertEquals(SkillCatalog.Ids.MARKET_QUOTE, gold.skillId)
+        assertEquals("GLDGR", gold.params["symbol"])
+
+        val index = assertNotNull(resolver.resolve("borsa nasıl"))
+        assertEquals(SkillCatalog.Ids.MARKET_QUOTE, index.skillId)
+        assertEquals("XU100", index.params["symbol"])
+    }
+
+    @Test
+    fun `the market summary is a phrase of its own`() = runBlocking {
+        val intent = assertNotNull(resolver.resolve("piyasalar nasıl"))
+
+        assertEquals(SkillCatalog.Ids.MARKET_SUMMARY, intent.skillId)
     }
 
     @Test

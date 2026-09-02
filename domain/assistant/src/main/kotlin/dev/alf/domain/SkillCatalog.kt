@@ -29,7 +29,8 @@ object SkillCatalog {
         const val WEATHER_NOW = "weather_now"
         const val WEATHER_TOMORROW = "weather_tomorrow"
         const val NEWS_HEADLINES = "news_headlines"
-        const val EXCHANGE_RATE = "exchange_rate"
+        const val MARKET_QUOTE = "market_quote"
+        const val MARKET_SUMMARY = "market_summary"
         const val TAKE_NOTE = "take_note"
     }
 
@@ -63,11 +64,18 @@ object SkillCatalog {
         SlotValue("bir saat", "60"),
     )
 
-    /** Central bank codes, spoken the way people actually ask. */
-    private val CURRENCIES: List<SlotValue> = listOf(
-        SlotValue("dolar", "USD"),
-        SlotValue("euro", "EUR"),
-        SlotValue("sterlin", "GBP"),
+    /**
+     * Feed symbols, spoken the way people actually ask. The value is the symbol the market feed
+     * uses, so the executor looks it up directly instead of translating twice.
+     */
+    private val INSTRUMENTS: List<SlotValue> = listOf(
+        SlotValue("dolar", "USDTRY"),
+        SlotValue("euro", "EURTRY"),
+        SlotValue("sterlin", "GBPTRY"),
+        SlotValue("gram altın", "GLDGR"),
+        SlotValue("altın", "GLDGR"),
+        SlotValue("borsa", "XU100"),
+        SlotValue("petrol", "BRENT"),
     )
 
     private val VOLUME_DIRECTIONS: List<SlotValue> = listOf(
@@ -188,19 +196,41 @@ object SkillCatalog {
             ),
         ),
         SkillDefinition(
-            id = Ids.EXCHANGE_RATE,
-            description = "Merkez Bankasının günlük kurunu söyler.",
-            parameters = listOf(ParamSpec("currency", "Kur kodu: USD, EUR veya GBP.")),
+            id = Ids.MARKET_QUOTE,
+            description = "Bir kur, altın, endeks veya emtia fiyatını söyler.",
+            parameters = listOf(ParamSpec("symbol", "Piyasa sembolü: USDTRY, EURTRY, GBPTRY, GLDGR, XU100, BRENT.")),
             requiresNetwork = true,
             utterances = listOf(
                 UtterancePattern(
                     template = "{birim} kaç",
-                    slots = listOf(SlotSpec("birim", param = "currency", values = CURRENCIES)),
+                    slots = listOf(SlotSpec("birim", param = "symbol", values = INSTRUMENTS)),
+                ),
+                UtterancePattern(
+                    template = "{birim} kaç oldu",
+                    slots = listOf(SlotSpec("birim", param = "symbol", values = INSTRUMENTS)),
                 ),
                 UtterancePattern(
                     template = "{birim} ne kadar",
-                    slots = listOf(SlotSpec("birim", param = "currency", values = CURRENCIES)),
+                    slots = listOf(SlotSpec("birim", param = "symbol", values = INSTRUMENTS)),
                 ),
+                UtterancePattern(
+                    template = "{birim} ne kadar oldu",
+                    slots = listOf(SlotSpec("birim", param = "symbol", values = INSTRUMENTS)),
+                ),
+                UtterancePattern(
+                    template = "{birim} nasıl",
+                    slots = listOf(SlotSpec("birim", param = "symbol", values = INSTRUMENTS)),
+                ),
+            ),
+        ),
+        SkillDefinition(
+            id = Ids.MARKET_SUMMARY,
+            description = "Endeks, dolar, euro ve gram altını tek seferde özetler.",
+            requiresNetwork = true,
+            utterances = listOf(
+                UtterancePattern("piyasalar nasıl"),
+                UtterancePattern("piyasalar ne durumda"),
+                UtterancePattern("piyasa özeti"),
             ),
         ),
         SkillDefinition(

@@ -36,7 +36,7 @@ class OfflineVocabularyTest {
 
         assertTrue(SkillCatalog.Ids.WEATHER_NOW in skillIds)
         assertTrue(SkillCatalog.Ids.NEWS_HEADLINES in skillIds)
-        assertTrue(SkillCatalog.Ids.EXCHANGE_RATE in skillIds)
+        assertTrue(SkillCatalog.Ids.MARKET_QUOTE in skillIds)
     }
 
     @Test

@@ -149,14 +149,21 @@ sağlar — kullanıcı açısından tamamen farklı iki şey.
 | Hava (şimdi) | "hava nasıl" | Open-Meteo |
 | Hava (yarın) | "yarın hava nasıl" | Open-Meteo |
 | Haberler | "haberlerde ne var" | BBC Türkçe RSS |
-| Döviz | "dolar kaç" | TCMB günlük kur XML |
+| Piyasa | "dolar kaç", "gram altın ne kadar oldu", "borsa nasıl" | BigPara |
+| Piyasa özeti | "piyasalar nasıl" | BigPara |
 | Not al | "not al ekmek almayı unutma" | — (serbest metin, bulut STT gerekir) |
 
 Uygulama açma, telefonla arama ve internette arama katalogdan çıkarıldı: cihaz bir tablet,
 telefon donanımı yok, ve serbest metinli arama zaten offline tanınamıyordu.
 
-Veri kaynakları için ek bağımlılık yok — XML'e `XmlPullParser`, JSON'a `org.json`, ikisi de
-Android'de yerleşik. Hava için konum, Open-Meteo'nun geocoding uç noktasıyla şehir adından bir
+Piyasa verisi tek bir çağrıdan geliyor (`api.bigpara.hurriyet.com.tr/doviz/headerlist/anasayfa`):
+endeks, dolar, euro, sterlin, gram altın ve Brent aynı yanıtta. Ayrıştırma saf Kotlin modülünde
+(`data/sources`), gerçek yanıt test verisi olarak sabitlendi.
+
+İki tuzak koda gerekçesiyle yazıldı: endeksin `ALIS`/`SATIS` alanları `0.0` geliyor (endekste alış
+satış yok), değer `KAPANIS`'ta — körü körüne `SATIS` okuyan bir kod "borsa sıfır" derdi. Ve
+sayılar TTS'e verilmeden önce Türkçe biçimlendiriliyor: `6705.58` bozuk rakam dizisi olarak
+okunur, `6.705,58` düzgün okunur. Hava için konum, Open-Meteo'nun geocoding uç noktasıyla şehir adından bir
 kez çözülüp saklanır; GPS izni gerekmez.
 
 ## 7. Faz Planı
