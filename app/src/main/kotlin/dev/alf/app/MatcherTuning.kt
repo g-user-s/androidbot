@@ -12,7 +12,9 @@ package dev.alf.app
 object MatcherTuning {
 
     /** Uncalibrated. Too low and alf never wakes; too high and it answers the television. */
-    const val WAKE_ACCEPT_DISTANCE = 3.0
+    // Three real "hey alf" samples from the target ALFA_8ST measured 2.985, 3.125 and 3.405.
+    // Keep a little headroom above the worst sample without making room noise too easy to accept.
+    const val WAKE_ACCEPT_DISTANCE = 3.5
 
     /** Commands can be looser: something has already said the wake word. */
     const val COMMAND_ACCEPT_DISTANCE = 3.5
