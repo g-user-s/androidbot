@@ -1,129 +1,155 @@
-# alf — Android 10 Sesli Asistan · Teknik Plan
+# alf — Sesli Ev Asistanı · Teknik Plan
 
-Uygulama adı: **alf**
-Hedef: Android 10 (API 29), stock/AOSP+GMS cihaz.
-Ana senaryo: Ekran kapalı ve kilitliyken "hey alf" → "efendim" → serbest konuşma.
-İnternet varsa bulut LLM, yoksa tamamen cihaz üstü çalışmaya düşer.
+Adanmış bir ev asistanı cihazı. Ekran kapalı ve kilitliyken "hey alf" → "efendim" → konuşma.
+İnternet varken bulut LLM ile serbest konuşma, internet yokken cihaz üstü komut tanıma.
 
-## 1. Kapsam
+## 1. Donanım ve Bunun Dayattıkları
 
-**v1 (offline iskelet):** Wake word, offline STT, TTS, kural tabanlı niyet çözümleme, temel cihaz yetenekleri.
-**v2 (LLM):** Aynı yetenekler Anthropic Messages API'ye tool olarak sunulur; internet yoksa otomatik olarak v1 davranışına düşer.
-
-Kapsam dışı: AccessibilityService ile UI otomasyonu, sistem varsayılan asistan rolü.
-
-## 2. Neden Kendi Wake Word Motorumuz
-
-Android'in `AlwaysOnHotwordDetector` API'si ses DSP'sini kullanır (CPU uyanmadan, neredeyse sıfır pil) ama üçüncü parti uygulamalara kapalıdır:
-
-- Uygulamanın cihazın aktif `VoiceInteractionService`'i olması gerekir,
-- `MANAGE_VOICE_KEYPHRASES` izni `signature|privileged` seviyesindedir (platform anahtarıyla imza veya `/system/priv-app` kurulumu),
-- Anahtar kelime modelinin DSP'ye üretici tarafından gömülmüş olması gerekir; "hey alf" oraya sonradan eklenemez.
-
-Sonuç: uyandırma sözcüğü ana CPU üzerinde, kendi mikrofon akışımızda tespit edilecek. Pil maliyeti bu kararın doğrudan sonucudur ve Bölüm 4'teki VAD katmanı bunu telafi etmek içindir.
-
-## 3. Ses Yığını — Kararlar
-
-| Katman | Seçim | Not |
-|---|---|---|
-| Wake word | **Vosk**, kısıtlı gramer `["hey alf", "[unk]"]` | Tam offline, Apache-2.0, lisans/AccessKey derdi yok |
-| STT | **Vosk** + `vosk-model-small-tr` (~40 MB) | Android 10'un `SpeechRecognizer`'ı internetsiz çalışmaz (cihaz üstü tanıma Android 12+) |
-| "efendim" yanıtı | **Gömülü ses dosyası** (mp3/ogg) | Gecikme <200 ms; TTS init + sentez + ses odağı gecikmesini atlar |
-| Diğer tüm cevaplar | Platform `TextToSpeech` | Açılışta `isLanguageAvailable(Locale("tr"))` kontrolü |
-
-**TTS güvenilirlik notu:** Türkçe TTS genelde mevcuttur ama garanti değildir — GMS'siz cihazda Google TTS yoktur (AOSP Pico Türkçe desteklemez), kullanıcı dil verisini silmiş olabilir, veya Türkçe ses "ağ gerektiren" varyant olarak işaretli olabilir. Eksikse kullanıcı `ACTION_INSTALL_TTS_DATA`'ya yönlendirilir; uyandırma yanıtı gömülü klip olduğu için asistan bu durumda da yanıt verir.
-
-Model dosyası: ilk açılışta indirilip app-specific dizinde saklanır (APK boyutunu şişirmemek için), indirilene kadar sadece metin girişi aktif.
-
-## 4. Sürekli Dinleme Boru Hattı
-
-```
-AudioRecord (16 kHz mono, sürekli açık)
-   → VAD (enerji/WebRTC tabanlı kapı)        ← sessizlikte Vosk çalışmaz
-   → Vosk KWS (kısıtlı gramer)               ← "hey alf" tespiti
-   → "efendim" klibi çalınır (anında)
-   → Vosk STT (tam model, tek cümle, ~6 sn sessizlik timeout)
-   → AssistantEngine.handle(text)
-       → çevrimiçi ise LlmResolver, değilse RuleBasedResolver
-       → SkillRegistry.find(intent).execute(params)
-   → TextToSpeech ile yanıt
-   → KWS moduna dön
-```
-
-VAD katmanı zorunlu: Vosk genel amaçlı bir tanıyıcıdır, adanmış bir KWS değil — sürekli decode bir çekirdeğin ~%15-25'ini yer. VAD ile sessizlikteki maliyet ihmal edilebilir seviyeye iner.
-
-Ölçülecek: sessiz bekleme modunda saatlik pil tüketimi (hedef <%3/saat), wake word yanlış tetikleme oranı, "hey alf" → "efendim" gecikmesi (hedef <200 ms).
-
-## 5. Ekran Kapalı / Kilitli Çalışma
-
-- `dataSync` tipli foreground service (Android 10'da `microphone` service tipi yok — o API 30+).
-- `PARTIAL_WAKE_LOCK` — Doze'da CPU'nun ses işlemeye devam etmesi için.
-- Foreground service, arka plan mikrofon kısıtından muaftır; ekran kapalıyken kayıt yapabilir.
-- `RECEIVE_BOOT_COMPLETED` ile yeniden başlatmada otomatik ayağa kalkar.
-- `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — stock Adaptive Battery uzun vadede kısıtlayabilir.
-- Ses odağı: telefon görüşmesi veya başka bir uygulama mikrofonu aldığında servis durur, bırakıldığında geri döner.
-- Görsel arayüz gerekmez (yanıt sesli); istenirse `setShowWhenLocked` + `setTurnScreenOn` ile kilit üstü ekran eklenebilir.
-
-## 6. Teknoloji Seçimleri
-
-| Alan | Seçim |
+| | |
 |---|---|
-| Dil / Build | Kotlin 2.x, Gradle KTS + version catalog, AGP 8.x |
-| SDK | minSdk 29, targetSdk 34, compileSdk 35 |
-| UI | Jetpack Compose + Material 3 |
-| DI | Hilt |
-| Async | Coroutines + Flow |
-| Kalıcılık | Room (konuşma geçmişi), DataStore (ayarlar) |
-| Ağ | OkHttp + kotlinx.serialization |
-| Sır saklama | androidx.security-crypto (API anahtarı) |
-| Test | JUnit4, Robolectric, Turbine, MockK |
-| CI | GitHub Actions: assembleDebug + unit test + lint |
+| SoC | MediaTek MT8167 — dört çekirdek, verimlilik sınıfı, big core yok |
+| RAM / Depolama | 2 GB / 32 GB |
+| OS | Android 10 (API 29), bootloader açık, **root var** |
+| Güç | **Pille çalışacak**, sürekli prizde değil |
 
-## 7. Modül Yapısı
+Bu dördü planın her kararını belirliyor:
+
+**Sıfır güçlü uyandırma mümkün değil.** Android'in `AlwaysOnHotwordDetector` API'si ses DSP'sini
+kullanır (CPU uyanmadan). Root, gereken `MANAGE_VOICE_KEYPHRASES` iznini ve varsayılan asistan
+olmayı çözer — ama asıl engel izin değil: anahtar kelimenin, cihazın SoundTrigger HAL'inin
+anladığı **üreticiye özel ikili model** olarak var olması gerekir. Bu blob'lar Qualcomm/Sensory
+gibi lisanslı araçlarla üretilir; "hey alf" için üretilemez. MT8167 sınıfı bir tablet
+platformunda SoundTrigger HAL'inin hiç bulunmaması da kuvvetle muhtemel.
+
+**Sonuç:** mikrofonu ana işlemcide dinleyeceğiz, AP wake lock ile ayakta kalacak.
+Kaba tahmin ~150-250 mW → 4000-6000 mAh pilde **3-4 gün**. Gece dinlemeyi kapatan bir zamanlama
+kuralı bunun ~%30'unu geri kazandırır. "Haftalarca pilde durur" bu donanımda mümkün değil.
+
+**Ağır motorlar elenir.** ~1.3 GHz verimlilik çekirdeğinde ve 2 GB RAM'de Vosk'un genel dil
+modeliyle serbest diktesi gerçek zamanın altına inmez; whisper.cpp tiny bile çok uzak (5 sn'lik
+cümle 15+ sn). Bu yüzden **cihaz üstü genel amaçlı konuşma tanıma yok.**
+
+## 2. Temel Karar: Offline = Komutlar, Online = Serbest Konuşma
+
+İnternet yokken asistanın **kapalı bir komut kümesini** tanıması yeterli. Bu, konuşma tanımayı
+tamamen gereksiz kılıyor: ihtiyaç duyulan şey N sınıflı bir ifade eşleştirici.
+
+| | İnternet var | İnternet yok |
+|---|---|---|
+| Uyandırma | Cihaz üstü eşleştirici | Cihaz üstü eşleştirici |
+| Anlama | Bulut STT + Claude (tool use) | Şablon eşleştirme + kural tabanlı çözücü |
+| Kapsam | Serbest dil, çok adımlı görevler | Sabit komut listesi |
+
+Kaybedilen tek şey internetsizken açık uçlu cümle söyleyebilmek — bu donanımda gerçekçi bir
+alternatifi zaten yok.
+
+## 3. Uyandırma ve Komut Eşleştirme
+
+**Eğitim yok.** Her komut ifadesi hazır Türkçe TTS sesleriyle sentezlenir, öznitelikleri
+çıkarılır ve referans şablon olarak saklanır. Çalışma anında gelen ses aynı öznitelik uzayında
+şablonlarla karşılaştırılır (DTW).
+
+Boru hattı:
 
 ```
-:app                    Giriş, DI grafiği, navigasyon
-:core:ui                Tema, ortak Compose bileşenleri
-:core:common            Result tipleri, dispatcher'lar, log
-:domain:assistant       AssistantEngine, Intent, Skill arayüzü, SkillRegistry
-:data:audio             AudioRecord, VAD, Vosk KWS + STT, TTS, ses klibi
-:data:nlu               RuleBasedResolver (v1), LlmResolver (v2)
-:data:prefs             Ayarlar, şifreli anahtar deposu
-:feature:chat           Sohbet ekranı, mikrofon/dinleme durumu
-:feature:settings       İzinler, model indirme, ses/dil, API anahtarı
+AudioRecord (16 kHz mono, ~250 ms bloklar)
+   → VAD kapısı                       sessizlikte hiçbir şey çalışmaz
+   → MFCC + CMVN                      kanal/konuşmacı farkını bastırır
+   → DTW ile şablon eşleştirme        önce sadece "hey alf"
+   → uyanma yanıtı klibi (rastgele)   "efendim" / "buradayım" / "dinliyorum"
+   → komut penceresi açılır           şablonlar tüm komut sözlüğü
+   → AssistantEngine.handle(metin)
 ```
 
-### Skill sözleşmesi
+**Bilinen risk:** TTS sesi ile insan sesi akustik olarak farklıdır ve şablon eşleştirme buna
+duyarlıdır. Komutlar için tolere edilebilir (kısa pencere, kullanıcı cihaza yönelmiş), ama
+**"hey alf" 7/24, uzaktan ve gürültüde** çalışacağı için yanlış tetikleme asıl risktir. Üç önlem:
 
-```kotlin
-interface Skill {
-    val id: String
-    val description: String            // v2'de LLM tool açıklaması
-    val parameters: List<ParamSpec>    // v2'de JSON schema
-    suspend fun execute(params: Map<String, String>): SkillResult
-}
+1. Komut başına birden fazla TTS sesi (kadın/erkek, farklı motorlar) — şablon çeşitliliği.
+2. CMVN ile kanal normalizasyonu.
+3. Eşleştirici bir arayüz arkasında; gerekirse **kullanıcı kaydı** eklenir (her kişi ifadeyi bir
+   kez söyler). Eğitim değil, sadece şablon toplama — ve doğruluğu belirgin biçimde yükseltir.
+
+Faz 2'de ölçülecek ilk sayı: saatte yanlış tetikleme, uyandırma gecikmesi (hedef <200 ms),
+sessiz bekleme pil tüketimi.
+
+**Uyanma yanıtı neden kayıt, TTS değil:** gecikme. TTS motorunu uyandırıp sentezlemek + ses odağı
+almak birkaç yüz ms ekler. Tek sabit ifade için kayıt hem anında hem tutarlı. Diğer tüm yanıtlar
+`TextToSpeech` ile üretilir; Türkçe ses paketi eksikse kullanıcı `ACTION_INSTALL_TTS_DATA`'ya
+yönlendirilir.
+
+## 4. Root'un Gerçek Kazanımları
+
+- `/system/priv-app` kurulumu + `android:persistent="true"` → servis hiç öldürülmez, Doze ile
+  uğraşılmaz.
+- `CAPTURE_AUDIO_HOTWORD` ile `AudioSource.HOTWORD` — cihaz destekliyorsa daha ucuz mikrofon yolu.
+- Cihazın çıplaklaştırılması: GMS, sync, hücresel radyo, Wi-Fi taraması kaldırılır. Adanmış bir
+  cihazda pil ve RAM kazancının büyük kısmı muhtemelen burada.
+- `Settings.Secure.voice_interaction_service` doğrudan yazılarak varsayılan asistan olunabilir.
+
+## 5. Mimari
+
+Niyet çözümleme ve yetenek kataloğu **saf Kotlin/JVM** modüllerinde: Android SDK'sı olmadan
+derlenir ve test edilir, testler saniyeler içinde çalışır, emülatör gerekmez.
+
+```
+domain/assistant     [JVM]      Skill, SkillDefinition, UtterancePattern, Intent, AssistantEngine
+data/nlu             [JVM]      TextNormalizer, RuleBasedIntentResolver, OfflineVocabulary
+data/audio           [Android]  AudioRecord, VAD, MFCC, DTW eşleştirici, TTS, klipler
+data/llm             [Android]  Anthropic Messages API istemcisi (tool use)
+data/prefs           [Android]  Ayarlar, şifreli API anahtarı
+domain/skills-impl   [Android]  Skill yürütücüleri (alarm, uygulama açma, arama...)
+feature/chat         [Android]  Sohbet ve dinleme durumu ekranı
+feature/settings     [Android]  İzinler, sesler, anahtar
+app                  [Android]  Giriş, DI, foreground service
 ```
 
-Kural tabanlı çözücü `Skill`'i doğrudan çağırır; LLM'e geçildiğinde aynı metadata `tools` dizisine serialize edilir. **Skill kodları v1'den v2'ye değişmez.**
+### Tek kaynak ilkesi
 
-### v1 skill listesi
-`open_app`, `set_alarm`, `set_timer`, `call` (ACTION_DIAL), `send_sms`, `web_search`, `device_info` (pil/saat/tarih), `note` (Room)
+`SkillDefinition` üç tüketiciyi birden besler:
 
-## 8. Faz Planı
+- `RuleBasedIntentResolver` — `utterances` üzerinden eşleştirir,
+- `OfflineVocabulary` — aynı ifadeleri TTS ile sentezlenecek şablon listesine çevirir,
+- LLM katmanı (Faz 3) — `description` + `parameters` alanlarını tool schema'ya serialize eder.
 
-**Faz 0 — İskelet (0.5 gün).** Gradle + modüller + Hilt + Compose tema + boş sohbet ekranı + CI.
+Yeni yetenek eklemek = kataloğa bir tanım + Android tarafında bir yürütücü. Başka hiçbir yer
+değişmez.
 
-**Faz 1 — Metin asistanı (1–2 gün).** AssistantEngine, Skill/SkillRegistry, kural tabanlı resolver (TR/EN), 8 skill, Room geçmişi. Metinle uçtan uca çalışır, hiçbir izin gerektirmez.
+### Slot türleri
 
-**Faz 2 — Ses boru hattı (3–4 gün) — projenin en riskli kısmı.** AudioRecord + VAD, Vosk entegrasyonu ve model indirme, wake word tespiti, "efendim" klibi, STT, TTS, foreground service + wake lock + boot receiver, RECORD_AUDIO izin akışı. Çıktı: ekran kapalıyken "hey alf" ile uyanan asistan.
+| Tür | Anlamı | Offline |
+|---|---|---|
+| `ENUMERATED` | Değerler katalogda sabit (saatler, süreler) | Evet |
+| `RUNTIME` | Değerler cihazda belli olur (kurulu uygulamalar, rehber) | Evet |
+| `FREE_TEXT` | Serbest metin (not içeriği, arama sorgusu) | Hayır |
 
-**Faz 3 — LLM (2–3 gün).** Anthropic Messages API istemcisi (streaming + tool use), Skill → tool schema dönüşümü, tool-call döngüsü, şifreli anahtar, çevrimdışı/hata durumunda kural tabanlı çözücüye otomatik düşüş.
+`FREE_TEXT` içeren bir ifade sonlu bir listeye açılamaz, dolayısıyla offline sözlüğe girmez —
+`SkillDefinition.availableOffline` bunu türetir, elle işaretlenmez.
 
-**Faz 4 — Sağlamlaştırma (2 gün).** Gerçek cihazda pil ölçümü, yanlış tetikleme ayarı, Doze testi, ses odağı çakışmaları, ProGuard, release imzalama.
+## 6. Faz Planı
 
-Toplam: ~9–13 gün.
+**Faz 0 — İskelet.** ✅ Tamamlandı. Gradle + version catalog + wrapper, saf Kotlin modüller, CI.
 
-## 9. Açık Sorular
+**Faz 1 — Çekirdek asistan.** ✅ Tamamlandı. `Skill` sözleşmesi, slot modeli, 11 yetenekli Türkçe
+katalog, kural tabanlı çözücü (birebir → serbest metin → bulanık eşleştirme), offline sözlük
+üreticisi, `AssistantEngine`. 27 birim testi.
 
-- Cihaz rootlu mu / kendi ROM'unu imzalayabiliyor musun? Öyleyse `/system/priv-app` kurulumu gerçek DSP wake word yolunu açar — pil tüketimi neredeyse sıfıra iner.
-- Vosk Türkçe modelinin "hey alf" üzerindeki yanlış tetikleme oranı sahada ölçülmeli; kabul edilemezse alternatif adanmış KWS (TFLite ile eğitilmiş özel model) değerlendirilir.
+**Faz 2 — Ses boru hattı (en riskli kısım).** AudioRecord + VAD, MFCC + CMVN, DTW eşleştirici,
+TTS ile şablon üretme aracı, uyanma klipleri, foreground service + wake lock + boot receiver,
+`/system/priv-app` kurulum betiği. Çıktı: ekran kapalıyken çalışan uyandırma.
+
+**Faz 3 — Android yetenekleri + arayüz.** Skill yürütücüleri, Compose sohbet ekranı, ayarlar,
+runtime slot doldurma (kurulu uygulamalar, rehber).
+
+**Faz 4 — LLM.** Anthropic Messages API istemcisi (streaming + tool use), `SkillDefinition` →
+tool schema, tool-call döngüsü, şifreli anahtar, çevrimdışında kural tabanlı çözücüye düşüş.
+
+**Faz 5 — Sağlamlaştırma.** Cihazda pil ölçümü, yanlış tetikleme ayarı, ses odağı çakışmaları,
+gece zamanlama kuralı, release imzalama.
+
+## 7. Açık Sorular
+
+- `adb shell lshal | grep -i soundtrigger` — boş dönerse DSP yolu kesin kapalı (beklenen).
+- `adb shell getprop ro.product.cpu.abilist` — 32/64 bit, yerel kütüphane ABI'si için gerekli.
+- Uyandırma ifadesi "hey alf" kısa; yanlış tetikleme yüksek çıkarsa daha uzun/ayırt edici bir
+  ifade tek satırlık bir katalog değişikliği.
