@@ -7,6 +7,12 @@
          must hold the permission matching its type. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!--
+      Android 10 refuses to let a background app start an activity, which is how the alarm and
+      timer commands hand off to the clock app. Holding this permission is the documented
+      exemption; on this device it is granted because the apk is installed as a system app.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!--

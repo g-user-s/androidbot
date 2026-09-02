@@ -36,6 +36,7 @@ val localSdkConfigured = file("local.properties").exists()
 
 if (androidRequested || localSdkConfigured) {
     include(":data:audio")
+    include(":data:skills")
     include(":app")
 } else {
     gradle.rootProject {

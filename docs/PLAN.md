@@ -194,8 +194,15 @@ biçimi. Tamamı saf Kotlin: sentetik sesle 53 test, cihaz gerekmiyor.
 klipleri, foreground service + wake lock + boot receiver, `/system/priv-app` kurulum betiği.
 Çıktı: ekran kapalıyken çalışan uyandırma.
 
-**Faz 3 — Android yetenekleri + arayüz.** Skill yürütücüleri, Compose sohbet ekranı, ayarlar,
-runtime slot doldurma (kurulu uygulamalar, rehber).
+**Faz 3 — Yetenek yürütücüleri.** ✅ Tamamlandı. On üç yetenek: saat, tarih, pil, alarm,
+zamanlayıcı, ses, iptal, not, piyasa (tekil + özet), haberler, hava (şimdi + yarın).
+
+Ayrıştırma ve Türkçe cümle üretimi saf Kotlin modülünde (`data/sources`), Android katmanı yalnızca
+tutkal: HTTP (`HttpURLConnection`, kütüphane yok), sistem servisleri, intent'ler. Böylece iş
+mantığı emülatörsüz test edilebiliyor.
+
+Ağ gerektiren bir yetenek çevrimdışıyken çalıştırılmıyor; alf "anlayamadım" yerine "şu an
+internetim yok" diyor.
 
 **Faz 4 — LLM.** Anthropic Messages API istemcisi (streaming + tool use), `SkillDefinition` →
 tool schema, tool-call döngüsü, şifreli anahtar, çevrimdışında kural tabanlı çözücüye düşüş.

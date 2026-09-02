@@ -1,26 +1,16 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
 }
 
 android {
-    namespace = "dev.alf.app"
+    namespace = "dev.alf.skills"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "dev.alf.app"
         minSdk = libs.versions.minSdk.get().toInt()
-        targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1"
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
     }
 
     compileOptions {
@@ -30,10 +20,7 @@ android {
 
     sourceSets["main"].java.srcDirs("src/main/kotlin")
 
-    // Lint runs as a separate CI step; a warning should not block a compile check.
-    lint {
-        abortOnError = false
-    }
+    lint { abortOnError = false }
 }
 
 kotlin {
@@ -41,8 +28,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":data:audio"))
-    implementation(project(":data:skills"))
+    api(project(":domain:assistant"))
+    api(project(":data:sources"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
 }

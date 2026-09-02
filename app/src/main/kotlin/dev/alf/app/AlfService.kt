@@ -32,6 +32,7 @@ import dev.alf.dsp.TemplateStore
 import dev.alf.dsp.VadConfig
 import dev.alf.dsp.VoiceSegmenter
 import dev.alf.nlu.OfflineVocabulary
+import dev.alf.skills.AlfSkills
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,8 +61,7 @@ class AlfService : Service() {
     private var tts: TurkishTts? = null
     private var wakeResponses: WakeResponsePlayer? = null
 
-    /** Empty until the skill executors land; the matcher already resolves ids and parameters. */
-    private val skills = SkillRegistry(emptyList())
+    private val skills: SkillRegistry by lazy { AlfSkills.registry(this) }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -186,12 +186,19 @@ class AlfService : Service() {
     }
 
     private suspend fun runCommand(event: ListenerEvent.Command, speech: TurkishTts) {
+        Log.i(TAG, "matched '${event.match.phrase}' -> ${event.match.skillId} ${event.match.params}")
+
         val skill = skills.find(event.match.skillId)
         if (skill == null) {
-            // Until the executors exist, say what was understood: it makes the matcher testable
-            // on the device without waiting for the rest of the assistant.
-            Log.i(TAG, "matched '${event.match.phrase}' -> ${event.match.skillId} ${event.match.params}")
-            speech.speak("${event.match.phrase}, anlaşıldı")
+            Log.w(TAG, "no executor for ${event.match.skillId}")
+            speech.speak(NOT_UNDERSTOOD)
+            return
+        }
+
+        // A phrase alf can hear but not answer offline: saying so is very different from
+        // claiming not to have understood, and only one of the two is true.
+        if (skill.definition.requiresNetwork && !AlfSkills.isOnline(this)) {
+            speech.speak(NO_CONNECTION)
             return
         }
 
@@ -322,6 +329,7 @@ class AlfService : Service() {
         private const val WAKE_LOCK_TAG = "alf:listening"
         private const val TEMPLATES_ASSET = "templates.alf"
         private const val NOT_UNDERSTOOD = "Bunu anlayamadım."
+        private const val NO_CONNECTION = "Şu an internetim yok."
         private const val SOMETHING_WENT_WRONG = "Bunu yaparken bir sorun çıktı."
 
         const val ACTION_STOP = "dev.alf.app.STOP"
