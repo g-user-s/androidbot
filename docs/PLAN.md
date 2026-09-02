@@ -61,8 +61,19 @@ AudioRecord (16 kHz mono, ~250 ms bloklar)
    → AssistantEngine.handle(metin)
 ```
 
-**Bilinen risk:** TTS sesi ile insan sesi akustik olarak farklıdır ve şablon eşleştirme buna
-duyarlıdır. Komutlar için tolere edilebilir (kısa pencere, kullanıcı cihaza yönelmiş), ama
+**Şablonlar nereden geliyor:** `tools/voicegen`, sözlüğü bir bulut ses servisiyle (ElevenLabs)
+seslendirip `app/src/main/assets/templates.alf` ve `app/src/main/res/raw/wake_*.wav` dosyalarını
+üretir. Bir iş istasyonunda bir kez çalıştırılır; **cihaz hiçbir zaman bir ses servisine bağlanmaz**,
+üretilen dosyalar APK içinde gider. Servisten 16 kHz PCM isteniyor, çünkü mikrofon 16 kHz açılıyor
+ve farklı örnekleme hızındaki bir referans başka bir öznitelik uzayına düşer.
+
+API anahtarı ortam değişkeninde (`ELEVENLABS_API_KEY`) tutulur, repoya girmez.
+
+Cihaz TTS'i ile şablon üretme yolu duruyor ama artık yedek: hazır dosya varsa o kullanılır, hem
+kalite daha iyi hem ilk açılış beklemesi yok.
+
+**Bilinen risk:** sentezlenmiş ses ile insan sesi akustik olarak farklıdır ve şablon eşleştirme
+buna duyarlıdır. Komutlar için tolere edilebilir (kısa pencere, kullanıcı cihaza yönelmiş), ama
 **"hey alf" 7/24, uzaktan ve gürültüde** çalışacağı için yanlış tetikleme asıl risktir. Üç önlem:
 
 1. Komut başına birden fazla TTS sesi (kadın/erkek, farklı motorlar) — şablon çeşitliliği.

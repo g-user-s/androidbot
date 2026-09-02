@@ -20,6 +20,7 @@ include(":domain:assistant")
 include(":data:nlu")
 include(":data:dsp")
 include(":data:sources")
+include(":tools:voicegen")
 
 // The Android modules need an SDK installed; the modules above do not. Including them only on
 // request keeps the core buildable and testable anywhere — a container without the SDK, a

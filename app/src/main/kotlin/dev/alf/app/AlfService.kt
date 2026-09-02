@@ -120,8 +120,9 @@ class AlfService : Service() {
             return
         }
 
-        wakeResponses = WakeResponsePlayer(File(cacheDir, "wake")).also {
+        wakeResponses = WakeResponsePlayer(this).also {
             it.prepare(speech, SkillCatalog.WAKE_RESPONSES)
+            Log.i(TAG, "wake clips from ${it.source}")
         }
 
         val (wakeTemplates, commandTemplates) =
@@ -204,13 +205,27 @@ class AlfService : Service() {
         }
     }
 
+    /**
+     * Templates come from the apk when the build ships them, and are only synthesised on the
+     * device as a fallback. Shipped templates are produced by a much better voice than this
+     * hardware has, and they also spare a slow first boot: see tools/voicegen.
+     */
     private suspend fun loadOrBuildTemplates(speech: TurkishTts): List<PhraseTemplate> {
         val file = templatesFile()
         if (file.exists()) {
             runCatching { file.inputStream().use { TemplateStore.read(it) } }
                 .onSuccess { if (it.isNotEmpty()) return it }
-                .onFailure { Log.w(TAG, "template file unreadable, rebuilding", it) }
+                .onFailure { Log.w(TAG, "cached template file unreadable, rebuilding", it) }
         }
+
+        runCatching { assets.open(TEMPLATES_ASSET).use { TemplateStore.read(it) } }
+            .onSuccess {
+                if (it.isNotEmpty()) {
+                    Log.i(TAG, "loaded ${it.size} shipped templates")
+                    return it
+                }
+            }
+            .onFailure { Log.i(TAG, "no shipped templates, falling back to the device engine") }
 
         setPhase(AlfState.Phase.BuildingTemplates)
         val built = TemplateSynthesizer(speech, File(cacheDir, "synth")).build(
@@ -305,6 +320,7 @@ class AlfService : Service() {
         private const val CHANNEL_ID = "alf.listening"
         private const val NOTIFICATION_ID = 1
         private const val WAKE_LOCK_TAG = "alf:listening"
+        private const val TEMPLATES_ASSET = "templates.alf"
         private const val NOT_UNDERSTOOD = "Bunu anlayamadım."
         private const val SOMETHING_WENT_WRONG = "Bunu yaparken bir sorun çıktı."
 
