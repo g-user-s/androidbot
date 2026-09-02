@@ -22,6 +22,11 @@ import dev.alf.audio.WakeResponsePlayer
 import dev.alf.domain.SkillCatalog
 import dev.alf.domain.SkillRegistry
 import dev.alf.domain.SkillResult
+import dev.alf.llm.GeminiClient
+import dev.alf.llm.GeminiReply
+import dev.alf.llm.GeminiRequest
+import dev.alf.llm.ModelChain
+import dev.alf.llm.Models
 import dev.alf.dsp.ConversationListener
 import dev.alf.dsp.FeatureSequence
 import dev.alf.dsp.ListenerEvent
@@ -32,7 +37,9 @@ import dev.alf.dsp.TemplateStore
 import dev.alf.dsp.VadConfig
 import dev.alf.dsp.VoiceSegmenter
 import dev.alf.nlu.OfflineVocabulary
+import dev.alf.skills.AlfSettings
 import dev.alf.skills.AlfSkills
+import dev.alf.skills.GeminiTransportHttp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,6 +48,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.LocalDate
 
 /**
  * The always on half of alf: microphone in, spoken answer out.
@@ -62,6 +70,23 @@ class AlfService : Service() {
     private var wakeResponses: WakeResponsePlayer? = null
 
     private val skills: SkillRegistry by lazy { AlfSkills.registry(this) }
+    private val settings: AlfSettings by lazy { AlfSettings(this) }
+
+    /**
+     * Built once so the chain remembers which models are spent for the day. Absent until a key is
+     * configured — without one the assistant is simply the offline one, which still works.
+     */
+    private val gemini: GeminiClient? by lazy {
+        settings.geminiApiKey.takeIf { it.isNotBlank() }?.let { key ->
+            val configured = Models.parse(settings.geminiModels)
+            val chain = ModelChain(
+                models = configured.ifEmpty { Models.DEFAULT_CHAIN },
+                today = { LocalDate.now().toEpochDay() },
+            )
+            Log.i(TAG, "model chain: " + chain.available().joinToString { it.id })
+            GeminiClient(chain, GeminiTransportHttp(key))
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -149,17 +174,17 @@ class AlfService : Service() {
             val utterance = segmenter.accept(frame)
             if (utterance == null) {
                 // Still lets the command window expire while nobody is speaking.
-                handle(listener.onTick(System.currentTimeMillis()), speech)
+                handle(listener.onTick(System.currentTimeMillis()), speech, utterance = null)
                 return@collect
             }
 
             val features = extractor.extract(utterance)
             if (MatcherTuning.LOG_RANKINGS) logRankings(diagnostics, features)
-            handle(listener.onUtterance(features, System.currentTimeMillis()), speech)
+            handle(listener.onUtterance(features, System.currentTimeMillis()), speech, utterance)
         }
     }
 
-    private suspend fun handle(event: ListenerEvent?, speech: TurkishTts) {
+    private suspend fun handle(event: ListenerEvent?, speech: TurkishTts, utterance: FloatArray?) {
         when (event) {
             null -> Unit
 
@@ -178,7 +203,8 @@ class AlfService : Service() {
 
             ListenerEvent.NotUnderstood -> {
                 setPhase(AlfState.Phase.Listening)
-                speech.speak(NOT_UNDERSTOOD)
+                // The local vocabulary did not have it. Anything beyond that needs the model.
+                if (utterance == null || !askGemini(utterance, speech)) speech.speak(NOT_UNDERSTOOD)
             }
 
             ListenerEvent.TimedOut -> setPhase(AlfState.Phase.Listening)
@@ -187,10 +213,13 @@ class AlfService : Service() {
 
     private suspend fun runCommand(event: ListenerEvent.Command, speech: TurkishTts) {
         Log.i(TAG, "matched '${event.match.phrase}' -> ${event.match.skillId} ${event.match.params}")
+        runSkill(event.match.skillId, event.match.params, speech)
+    }
 
-        val skill = skills.find(event.match.skillId)
+    private suspend fun runSkill(skillId: String, params: Map<String, String>, speech: TurkishTts) {
+        val skill = skills.find(skillId)
         if (skill == null) {
-            Log.w(TAG, "no executor for ${event.match.skillId}")
+            Log.w(TAG, "no executor for $skillId")
             speech.speak(NOT_UNDERSTOOD)
             return
         }
@@ -202,13 +231,56 @@ class AlfService : Service() {
             return
         }
 
-        val reply = runCatching { skill.execute(event.match.params) }
+        val reply = runCatching { skill.execute(params) }
             .getOrElse { SkillResult.Failed(it.toString(), SOMETHING_WENT_WRONG) }
 
         when (reply) {
             is SkillResult.Spoken -> speech.speak(reply.text)
             is SkillResult.Failed -> speech.speak(reply.spoken)
             SkillResult.Silent -> Unit
+        }
+    }
+
+    /**
+     * The fallback for whatever the fixed vocabulary cannot cover.
+     *
+     * The captured audio goes up as it is, with the skills offered as callable functions, so one
+     * round trip covers both understanding the speech and deciding what to do about it. Returns
+     * false when nothing was said back, leaving the caller to give the ordinary "I did not
+     * understand" — the honest answer when there is no model to ask.
+     */
+    private suspend fun askGemini(utterance: FloatArray, speech: TurkishTts): Boolean {
+        val client = gemini ?: return false
+        if (!AlfSkills.isOnline(this)) {
+            speech.speak(NO_CONNECTION)
+            return true
+        }
+
+        val request = runCatching {
+            GeminiRequest.forAudio(utterance.toWavBase64(vadConfig.sampleRate), skills.definitions)
+        }.getOrElse {
+            Log.w(TAG, "could not package the utterance", it)
+            return false
+        }
+
+        return when (val reply = client.ask(request)) {
+            is GeminiReply.CallSkill -> {
+                Log.i(TAG, "model chose ${reply.skillId} ${reply.arguments}")
+                runSkill(reply.skillId, reply.arguments, speech)
+                true
+            }
+            is GeminiReply.Spoken -> {
+                speech.speak(reply.text)
+                true
+            }
+            GeminiReply.QuotaExhausted -> {
+                speech.speak(QUOTA_SPENT)
+                true
+            }
+            is GeminiReply.Failed -> {
+                Log.w(TAG, "model failed: ${reply.reason}")
+                false
+            }
         }
     }
 
@@ -330,6 +402,7 @@ class AlfService : Service() {
         private const val TEMPLATES_ASSET = "templates.alf"
         private const val NOT_UNDERSTOOD = "Bunu anlayamadım."
         private const val NO_CONNECTION = "Şu an internetim yok."
+        private const val QUOTA_SPENT = "Bugünlük soru hakkım doldu, yarın tekrar deneyin."
         private const val SOMETHING_WENT_WRONG = "Bunu yaparken bir sorun çıktı."
 
         const val ACTION_STOP = "dev.alf.app.STOP"

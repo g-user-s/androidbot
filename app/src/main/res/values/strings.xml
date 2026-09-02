@@ -13,4 +13,9 @@
     <string name="action_start">Başlat</string>
     <string name="action_stop">Durdur</string>
     <string name="action_rebuild">Şablonları yeniden üret</string>
+    <string name="action_save">Ayarları kaydet</string>
+    <string name="hint_api_key">Gemini API anahtarı</string>
+    <string name="hint_models">Model uç noktaları, satır başına bir tane (boşsa varsayılanlar)</string>
+    <string name="hint_city">Şehir (hava durumu için)</string>
+    <string name="saved">Kaydedildi</string>
 </resources>

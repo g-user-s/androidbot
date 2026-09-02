@@ -30,6 +30,7 @@ kotlin {
 dependencies {
     api(project(":domain:assistant"))
     api(project(":data:sources"))
+    api(project(":data:llm"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
 }

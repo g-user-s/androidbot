@@ -1,6 +1,5 @@
-package dev.alf.voicegen
+package dev.alf.dsp
 
-import dev.alf.dsp.WavReader
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin

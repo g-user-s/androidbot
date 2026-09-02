@@ -8,10 +8,14 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
+import android.widget.ScrollView
+import android.widget.Toast
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import dev.alf.skills.AlfSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,7 +35,11 @@ import kotlinx.coroutines.launch
 class MainActivity : Activity() {
 
     private lateinit var status: TextView
+    private lateinit var apiKey: EditText
+    private lateinit var models: EditText
+    private lateinit var city: EditText
     private var scope: CoroutineScope? = null
+    private val settings by lazy { AlfSettings(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,9 +74,13 @@ class MainActivity : Activity() {
             text = getString(R.string.status_stopped)
         }
 
-        return LinearLayout(this).apply {
+        apiKey = field(R.string.hint_api_key, settings.geminiApiKey)
+        // Several lines: the chain is tried in order, so it is a list, not a single choice.
+        models = field(R.string.hint_models, settings.geminiModels, lines = 4)
+        city = field(R.string.hint_city, settings.city)
+
+        val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
             setPadding(padding, padding, padding, padding)
 
             addView(status)
@@ -79,7 +91,30 @@ class MainActivity : Activity() {
                     AlfService.start(this@MainActivity, AlfService.ACTION_REBUILD_TEMPLATES)
                 },
             )
+            addView(apiKey)
+            addView(models)
+            addView(city)
+            addView(button(R.string.action_save) { save() })
         }
+
+        return ScrollView(this).apply { addView(column) }
+    }
+
+    private fun save() {
+        settings.geminiApiKey = apiKey.text.toString()
+        settings.geminiModels = models.text.toString()
+        // Setting the city clears the stored coordinates, so the next weather question resolves
+        // the new place rather than answering for the old one.
+        city.text.toString().trim().takeIf { it.isNotEmpty() && it != settings.city }
+            ?.let { settings.city = it }
+        Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun field(hintRes: Int, value: String, lines: Int = 1) = EditText(this).apply {
+        setHint(hintRes)
+        setText(value)
+        setLines(lines)
+        isSingleLine = lines == 1
     }
 
     private fun button(labelRes: Int, onClick: () -> Unit) = Button(this).apply {

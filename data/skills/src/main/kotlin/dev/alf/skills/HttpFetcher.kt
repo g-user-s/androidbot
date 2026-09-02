@@ -20,37 +20,77 @@ class HttpFetcher(
     private val readTimeoutMs: Int = 10_000,
     private val maxBytes: Int = 512 * 1024,
 ) {
-    suspend fun get(url: String): String = withContext(Dispatchers.IO) {
+    data class Response(val status: Int, val body: String)
+
+    /** Throws on anything but a 2xx, because a feed that did not answer has nothing to parse. */
+    suspend fun get(url: String): String {
+        val response = request(url, method = "GET")
+        if (response.status !in 200..299) throw IOException("$url returned ${response.status}")
+        return response.body
+    }
+
+    /**
+     * Returns the status alongside the body rather than throwing.
+     *
+     * The model service says things worth reading in its error responses — an exhausted quota
+     * comes back as a 429 with a body that names it — and turning that into an exception would
+     * throw away exactly the information the caller needs to pick another model.
+     */
+    suspend fun post(
+        url: String,
+        body: String,
+        contentType: String = "application/json; charset=utf-8",
+        headers: Map<String, String> = emptyMap(),
+    ): Response = request(url, method = "POST", body = body, contentType = contentType, headers = headers)
+
+    private suspend fun request(
+        url: String,
+        method: String,
+        body: String? = null,
+        contentType: String? = null,
+        headers: Map<String, String> = emptyMap(),
+    ): Response = withContext(Dispatchers.IO) {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
+            requestMethod = method
             connectTimeout = connectTimeoutMs
             readTimeout = readTimeoutMs
             instanceFollowRedirects = true
             // Some feeds refuse the default Java agent outright.
             setRequestProperty("User-Agent", USER_AGENT)
             setRequestProperty("Accept-Encoding", "identity")
+            headers.forEach { (name, value) -> setRequestProperty(name, value) }
+            if (body != null) {
+                doOutput = true
+                contentType?.let { setRequestProperty("Content-Type", it) }
+            }
         }
 
         try {
-            val status = connection.responseCode
-            if (status !in 200..299) throw IOException("$url returned $status")
+            body?.let { payload ->
+                connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+            }
 
+            val status = connection.responseCode
             val charset = connection.contentEncoding?.let { runCatching { Charset.forName(it) }.getOrNull() }
                 ?: Charsets.UTF_8
 
-            connection.inputStream.use { stream ->
+            // An error status still carries a body, and that body is the useful part.
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val text = stream?.use { source ->
                 val buffer = ByteArray(16 * 1024)
-                val body = StringBuilder()
+                val collected = StringBuilder()
                 var total = 0
                 while (true) {
-                    val read = stream.read(buffer)
+                    val read = source.read(buffer)
                     if (read <= 0) break
                     total += read
                     if (total > maxBytes) throw IOException("$url exceeded $maxBytes bytes")
-                    body.append(String(buffer, 0, read, charset))
+                    collected.append(String(buffer, 0, read, charset))
                 }
-                body.toString()
-            }
+                collected.toString()
+            }.orEmpty()
+
+            Response(status, text)
         } finally {
             connection.disconnect()
         }

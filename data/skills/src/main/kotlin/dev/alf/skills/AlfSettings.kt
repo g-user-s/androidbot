@@ -24,6 +24,28 @@ class AlfSettings(context: Context) {
                 preferences.getFloat(KEY_LONGITUDE, 0f).toDouble()
         }
 
+    /**
+     * Stored in plain preferences on purpose.
+     *
+     * This device is rooted by design, so anything the app can read, root can read; wrapping the
+     * key in an encrypted store would add a library and imply a protection it cannot provide
+     * here. The real mitigation is the key itself: issue one that is only used for this
+     * assistant, and revoke it if the device is lost.
+     */
+    var geminiApiKey: String
+        get() = preferences.getString(KEY_GEMINI, "") ?: ""
+        set(value) = preferences.edit().putString(KEY_GEMINI, value.trim()).apply()
+
+    /**
+     * The model endpoints to try, best first, one per line.
+     *
+     * Editable because Google ships new Flash revisions often; chasing them should be a line of
+     * text on the settings screen, not a new build. Empty means the built in defaults.
+     */
+    var geminiModels: String
+        get() = preferences.getString(KEY_MODELS, "") ?: ""
+        set(value) = preferences.edit().putString(KEY_MODELS, value).apply()
+
     fun rememberCoordinates(latitude: Double, longitude: Double) {
         preferences.edit()
             .putFloat(KEY_LATITUDE, latitude.toFloat())
@@ -33,6 +55,8 @@ class AlfSettings(context: Context) {
 
     private companion object {
         const val KEY_CITY = "city"
+        const val KEY_GEMINI = "gemini_api_key"
+        const val KEY_MODELS = "gemini_models"
         const val KEY_LATITUDE = "latitude"
         const val KEY_LONGITUDE = "longitude"
         const val DEFAULT_CITY = "İstanbul"

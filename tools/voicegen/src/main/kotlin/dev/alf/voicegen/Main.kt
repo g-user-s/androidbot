@@ -2,6 +2,7 @@ package dev.alf.voicegen
 
 import dev.alf.domain.SkillCatalog
 import dev.alf.dsp.TemplateStore
+import dev.alf.dsp.WavWriter
 import dev.alf.nlu.OfflineVocabulary
 import java.io.File
 import kotlin.system.exitProcess

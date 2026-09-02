@@ -1,4 +1,4 @@
-package dev.alf.voicegen
+package dev.alf.dsp
 
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer

@@ -204,8 +204,23 @@ mantığı emülatörsüz test edilebiliyor.
 Ağ gerektiren bir yetenek çevrimdışıyken çalıştırılmıyor; alf "anlayamadım" yerine "şu an
 internetim yok" diyor.
 
-**Faz 4 — LLM.** Anthropic Messages API istemcisi (streaming + tool use), `SkillDefinition` →
-tool schema, tool-call döngüsü, şifreli anahtar, çevrimdışında kural tabanlı çözücüye düşüş.
+**Faz 4 — Bulut modeli.** ✅ Çekirdeği tamamlandı. Gemini istek üretimi (`SkillDefinition` →
+functionDeclarations), yanıt ayrıştırma, kotaya göre model zinciri, cihaz tarafı bağlantısı.
+
+Yerel eşleştirici tanıyamadığında ve internet varken, yakalanan ses olduğu gibi yukarı gidiyor;
+yetenekler çağrılabilir fonksiyon olarak sunulduğu için **tek gidiş-dönüş** hem konuşmayı
+anlamayı hem ne yapılacağına karar vermeyi kapsıyor. Ayrı bir STT adımı yok.
+
+Modeller sırayla deneniyor, en yenisi başta; biri kotasını doldurunca bir alttakine geçiliyor.
+Ücretsiz katmanda kota bitmesi hata değil, o modelin gününün normal sonu. **Model listesi
+ayarlar ekranından düzenlenebiliyor** — yeni bir Flash sürümü çıktığında yeni yapı gerekmiyor.
+
+Güncel ücretsiz katman limitleri: <https://aistudio.google.com/rate-limit>
+
+API anahtarı düz tercihlerde saklanıyor. Cihaz tasarım gereği rootlu; uygulamanın okuyabildiğini
+root da okur, şifreli depo bir kütüphane ekleyip veremeyeceği bir korumayı ima ederdi. Gerçek
+önlem anahtarın kendisi: yalnızca bu asistan için üretilmiş, kaybolursa iptal edilebilir bir
+anahtar.
 
 **Faz 5 — Sağlamlaştırma.** Cihazda pil ölçümü, yanlış tetikleme ayarı, ses odağı çakışmaları,
 gece zamanlama kuralı, release imzalama.
