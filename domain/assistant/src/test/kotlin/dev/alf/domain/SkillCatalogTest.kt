@@ -19,14 +19,37 @@ class SkillCatalogTest {
     }
 
     @Test
-    fun `free text skills are the only ones unavailable offline`() {
-        val offline = SkillCatalog.definitions.filter { it.availableOffline }.map { it.id }.toSet()
+    fun `only free text skills cannot be recognised offline`() {
+        val recognisable = SkillCatalog.definitions.filter { it.recognisableOffline }.map { it.id }.toSet()
 
-        assertTrue(SkillCatalog.Ids.SET_ALARM in offline)
-        assertTrue(SkillCatalog.Ids.TIME_NOW in offline)
-        assertTrue(SkillCatalog.Ids.OPEN_APP in offline, "runtime slots are still enumerable on device")
-        assertFalse(SkillCatalog.Ids.WEB_SEARCH in offline)
-        assertFalse(SkillCatalog.Ids.TAKE_NOTE in offline)
+        assertTrue(SkillCatalog.Ids.SET_ALARM in recognisable)
+        assertTrue(SkillCatalog.Ids.TIME_NOW in recognisable)
+        assertFalse(SkillCatalog.Ids.TAKE_NOTE in recognisable, "a note body is not a finite phrase")
+    }
+
+    @Test
+    fun `data skills are heard offline even though they cannot answer`() {
+        // The distinction alf's replies depend on: it should say it has no connection rather
+        // than that it did not understand.
+        val weather = SkillCatalog.definitions.first { it.id == SkillCatalog.Ids.WEATHER_NOW }
+
+        assertTrue(weather.recognisableOffline)
+        assertTrue(weather.requiresNetwork)
+    }
+
+    @Test
+    fun `only the data skills need the network`() {
+        val networked = SkillCatalog.definitions.filter { it.requiresNetwork }.map { it.id }.toSet()
+
+        assertEquals(
+            setOf(
+                SkillCatalog.Ids.WEATHER_NOW,
+                SkillCatalog.Ids.WEATHER_TOMORROW,
+                SkillCatalog.Ids.NEWS_HEADLINES,
+                SkillCatalog.Ids.EXCHANGE_RATE,
+            ),
+            networked,
+        )
     }
 
     @Test

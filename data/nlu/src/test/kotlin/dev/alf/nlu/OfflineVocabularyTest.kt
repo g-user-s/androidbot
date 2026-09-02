@@ -25,8 +25,18 @@ class OfflineVocabularyTest {
         val skillIds = OfflineVocabulary.build().map { it.skillId }.toSet()
 
         assertTrue(SkillCatalog.Ids.SET_ALARM in skillIds)
-        assertTrue(SkillCatalog.Ids.WEB_SEARCH !in skillIds)
         assertTrue(SkillCatalog.Ids.TAKE_NOTE !in skillIds)
+    }
+
+    @Test
+    fun `phrases that need the network are still in the offline vocabulary`() {
+        // They have to be: recognising "hava nasıl" while offline is what lets alf explain that
+        // it has no connection instead of claiming it did not understand.
+        val skillIds = OfflineVocabulary.build().map { it.skillId }.toSet()
+
+        assertTrue(SkillCatalog.Ids.WEATHER_NOW in skillIds)
+        assertTrue(SkillCatalog.Ids.NEWS_HEADLINES in skillIds)
+        assertTrue(SkillCatalog.Ids.EXCHANGE_RATE in skillIds)
     }
 
     @Test

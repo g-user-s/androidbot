@@ -13,6 +13,14 @@ data class SkillDefinition(
     val description: String,
     val parameters: List<ParamSpec> = emptyList(),
     val utterances: List<UtterancePattern> = emptyList(),
+    /**
+     * Whether running this skill needs the network, independent of whether it can be *heard*
+     * without one. A weather question is a fixed phrase, so the offline matcher recognises it
+     * perfectly well while the device is offline — it just cannot be answered. Keeping the two
+     * apart is what lets alf say "I have no connection right now" instead of "I did not
+     * understand that", which are very different things to hear.
+     */
+    val requiresNetwork: Boolean = false,
 ) {
     init {
         require(id.isNotBlank()) { "skill id must not be blank" }
@@ -24,11 +32,12 @@ data class SkillDefinition(
     }
 
     /**
-     * Whether at least one phrasing survives without a network. A skill taking free text — a
-     * note body, a search query — has nothing the offline matcher can compare against, so it
-     * simply goes quiet until the assistant is back online.
+     * Whether at least one phrasing can be recognised with no network. A skill taking free text
+     * — a note body — has nothing the offline matcher can compare against, so it is not even
+     * heard while the assistant is offline. Being recognisable says nothing about being
+     * runnable: see [requiresNetwork].
      */
-    val availableOffline: Boolean = utterances.any { it.enumerable }
+    val recognisableOffline: Boolean = utterances.any { it.enumerable }
 }
 
 data class ParamSpec(

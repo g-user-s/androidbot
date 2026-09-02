@@ -119,16 +119,47 @@ değişmez.
 
 ### Slot türleri
 
-| Tür | Anlamı | Offline |
+| Tür | Anlamı | Offline tanınır |
 |---|---|---|
-| `ENUMERATED` | Değerler katalogda sabit (saatler, süreler) | Evet |
-| `RUNTIME` | Değerler cihazda belli olur (kurulu uygulamalar, rehber) | Evet |
-| `FREE_TEXT` | Serbest metin (not içeriği, arama sorgusu) | Hayır |
+| `ENUMERATED` | Değerler katalogda sabit (saatler, süreler, kur kodları) | Evet |
+| `RUNTIME` | Değerler cihazda belli olur | Evet |
+| `FREE_TEXT` | Serbest metin (not içeriği) | Hayır |
 
 `FREE_TEXT` içeren bir ifade sonlu bir listeye açılamaz, dolayısıyla offline sözlüğe girmez —
-`SkillDefinition.availableOffline` bunu türetir, elle işaretlenmez.
+`SkillDefinition.recognisableOffline` bunu türetir, elle işaretlenmez.
 
-## 6. Faz Planı
+### Tanınmak ile çalıştırılabilmek ayrı şeyler
+
+`requiresNetwork`, bir yeteneğin *duyulabilmesinden* bağımsız olarak *cevaplanabilmesini*
+işaretler. "hava nasıl" sabit bir ifadedir; eşleştirici onu internetsizken de tanır, ama cevabı
+üretemez. İkisini ayırmak, alf'in "anlayamadım" yerine **"şu an internetim yok"** demesini
+sağlar — kullanıcı açısından tamamen farklı iki şey.
+
+## 6. Yetenekler
+
+| Yetenek | Örnek cümle | Ağ |
+|---|---|---|
+| Saat | "saat kaç" | — |
+| Tarih | "bugün günlerden ne" | — |
+| Pil | "pil ne kadar" | — |
+| Alarm | "alarmı yediye kur" | — |
+| Zamanlayıcı | "beş dakika zamanlayıcı kur" | — |
+| Ses | "sesi kıs" | — |
+| İptal | "boş ver" | — |
+| Hava (şimdi) | "hava nasıl" | Open-Meteo |
+| Hava (yarın) | "yarın hava nasıl" | Open-Meteo |
+| Haberler | "haberlerde ne var" | BBC Türkçe RSS |
+| Döviz | "dolar kaç" | TCMB günlük kur XML |
+| Not al | "not al ekmek almayı unutma" | — (serbest metin, bulut STT gerekir) |
+
+Uygulama açma, telefonla arama ve internette arama katalogdan çıkarıldı: cihaz bir tablet,
+telefon donanımı yok, ve serbest metinli arama zaten offline tanınamıyordu.
+
+Veri kaynakları için ek bağımlılık yok — XML'e `XmlPullParser`, JSON'a `org.json`, ikisi de
+Android'de yerleşik. Hava için konum, Open-Meteo'nun geocoding uç noktasıyla şehir adından bir
+kez çözülüp saklanır; GPS izni gerekmez.
+
+## 7. Faz Planı
 
 **Faz 0 — İskelet.** ✅ Tamamlandı. Gradle + version catalog + wrapper, saf Kotlin modüller, CI.
 
@@ -154,7 +185,7 @@ tool schema, tool-call döngüsü, şifreli anahtar, çevrimdışında kural tab
 **Faz 5 — Sağlamlaştırma.** Cihazda pil ölçümü, yanlış tetikleme ayarı, ses odağı çakışmaları,
 gece zamanlama kuralı, release imzalama.
 
-## 7. Eşik Kalibrasyonu
+## 8. Eşik Kalibrasyonu
 
 `PhraseMatcher` iki kapı kullanıyor ve ikisi de cihazda ölçülerek ayarlanmalı:
 
@@ -172,7 +203,7 @@ ayıran noktayı seç. Ölçülecek sayı: **saatte yanlış tetikleme** (hedef 
 Uyandırma sözlüğü tek ifade olduğu için orada `minMargin` işlevsizdir (karşılaştırılacak rakip
 yok); asıl işini komut penceresinde görür.
 
-## 8. Açık Sorular
+## 9. Açık Sorular
 
 - `adb shell lshal | grep -i soundtrigger` — boş dönerse DSP yolu kesin kapalı (beklenen).
 - `adb shell getprop ro.product.cpu.abilist` — 32/64 bit, yerel kütüphane ABI'si için gerekli.

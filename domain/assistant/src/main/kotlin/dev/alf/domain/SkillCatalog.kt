@@ -26,9 +26,10 @@ object SkillCatalog {
         const val SET_TIMER = "set_timer"
         const val SET_VOLUME = "set_volume"
         const val CANCEL = "cancel"
-        const val OPEN_APP = "open_app"
-        const val CALL = "call"
-        const val WEB_SEARCH = "web_search"
+        const val WEATHER_NOW = "weather_now"
+        const val WEATHER_TOMORROW = "weather_tomorrow"
+        const val NEWS_HEADLINES = "news_headlines"
+        const val EXCHANGE_RATE = "exchange_rate"
         const val TAKE_NOTE = "take_note"
     }
 
@@ -60,6 +61,13 @@ object SkillCatalog {
         SlotValue("yarım saat", "30"),
         SlotValue("kırk beş dakika", "45"),
         SlotValue("bir saat", "60"),
+    )
+
+    /** Central bank codes, spoken the way people actually ask. */
+    private val CURRENCIES: List<SlotValue> = listOf(
+        SlotValue("dolar", "USD"),
+        SlotValue("euro", "EUR"),
+        SlotValue("sterlin", "GBP"),
     )
 
     private val VOLUME_DIRECTIONS: List<SlotValue> = listOf(
@@ -151,47 +159,47 @@ object SkillCatalog {
             ),
         ),
         SkillDefinition(
-            id = Ids.OPEN_APP,
-            description = "Adı verilen uygulamayı açar.",
-            parameters = listOf(ParamSpec("package", "Açılacak uygulamanın paket adı.")),
+            id = Ids.WEATHER_NOW,
+            description = "Ayarlanan şehir için güncel hava durumunu söyler.",
+            requiresNetwork = true,
             utterances = listOf(
-                UtterancePattern(
-                    template = "{uygulama} aç",
-                    slots = listOf(SlotSpec("uygulama", param = "package", kind = SlotKind.RUNTIME)),
-                ),
-                UtterancePattern(
-                    template = "{uygulama} uygulamasını aç",
-                    slots = listOf(SlotSpec("uygulama", param = "package", kind = SlotKind.RUNTIME)),
-                ),
+                UtterancePattern("hava nasıl"),
+                UtterancePattern("hava durumu ne"),
+                UtterancePattern("dışarısı kaç derece"),
             ),
         ),
         SkillDefinition(
-            id = Ids.CALL,
-            description = "Rehberdeki bir kişiyi arama ekranını açar.",
-            parameters = listOf(ParamSpec("contact", "Aranacak kişinin adı.")),
+            id = Ids.WEATHER_TOMORROW,
+            description = "Yarınki hava durumunu söyler.",
+            requiresNetwork = true,
             utterances = listOf(
-                UtterancePattern(
-                    template = "{kisi} ara",
-                    slots = listOf(SlotSpec("kisi", param = "contact", kind = SlotKind.RUNTIME)),
-                ),
-                UtterancePattern(
-                    template = "{kisi} telefon et",
-                    slots = listOf(SlotSpec("kisi", param = "contact", kind = SlotKind.RUNTIME)),
-                ),
+                UtterancePattern("yarın hava nasıl"),
+                UtterancePattern("yarın hava durumu ne"),
             ),
         ),
         SkillDefinition(
-            id = Ids.WEB_SEARCH,
-            description = "Verilen sorguyu internette aratır.",
-            parameters = listOf(ParamSpec("query", "Aranacak metin.")),
+            id = Ids.NEWS_HEADLINES,
+            description = "Son haber başlıklarını okur.",
+            requiresNetwork = true,
+            utterances = listOf(
+                UtterancePattern("haberler"),
+                UtterancePattern("haberlerde ne var"),
+                UtterancePattern("son haberler"),
+            ),
+        ),
+        SkillDefinition(
+            id = Ids.EXCHANGE_RATE,
+            description = "Merkez Bankasının günlük kurunu söyler.",
+            parameters = listOf(ParamSpec("currency", "Kur kodu: USD, EUR veya GBP.")),
+            requiresNetwork = true,
             utterances = listOf(
                 UtterancePattern(
-                    template = "internette {sorgu} ara",
-                    slots = listOf(SlotSpec("sorgu", param = "query", kind = SlotKind.FREE_TEXT)),
+                    template = "{birim} kaç",
+                    slots = listOf(SlotSpec("birim", param = "currency", values = CURRENCIES)),
                 ),
                 UtterancePattern(
-                    template = "{sorgu} nedir",
-                    slots = listOf(SlotSpec("sorgu", param = "query", kind = SlotKind.FREE_TEXT)),
+                    template = "{birim} ne kadar",
+                    slots = listOf(SlotSpec("birim", param = "currency", values = CURRENCIES)),
                 ),
             ),
         ),

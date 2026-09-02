@@ -1,6 +1,12 @@
 package dev.alf.nlu
 
+import dev.alf.domain.ParamSpec
 import dev.alf.domain.SkillCatalog
+import dev.alf.domain.SkillDefinition
+import dev.alf.domain.SlotKind
+import dev.alf.domain.SlotSpec
+import dev.alf.domain.SlotValue
+import dev.alf.domain.UtterancePattern
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,10 +52,39 @@ class RuleBasedIntentResolverTest {
 
     @Test
     fun `free text in the middle of a template stops at the trailing words`() = runBlocking {
-        val intent = assertNotNull(resolver.resolve("internette hava durumu ara"))
+        // Built here rather than taken from the catalog: this is a property of the resolver, and
+        // it should keep being checked whether or not a shipped skill happens to be shaped so.
+        val definition = SkillDefinition(
+            id = "lookup",
+            description = "test",
+            parameters = listOf(ParamSpec("query", "aranan")),
+            utterances = listOf(
+                UtterancePattern(
+                    template = "internette {sorgu} ara",
+                    slots = listOf(SlotSpec("sorgu", param = "query", kind = SlotKind.FREE_TEXT)),
+                ),
+            ),
+        )
 
-        assertEquals(SkillCatalog.Ids.WEB_SEARCH, intent.skillId)
+        val intent = assertNotNull(RuleBasedIntentResolver(listOf(definition)).resolve("internette hava durumu ara"))
+
+        assertEquals("lookup", intent.skillId)
         assertEquals("hava durumu", intent.params["query"])
+    }
+
+    @Test
+    fun `a phrase needing the network still resolves`() = runBlocking {
+        val intent = assertNotNull(resolver.resolve("hava nasıl"))
+
+        assertEquals(SkillCatalog.Ids.WEATHER_NOW, intent.skillId)
+    }
+
+    @Test
+    fun `currency slot maps to a code`() = runBlocking {
+        val intent = assertNotNull(resolver.resolve("dolar kaç"))
+
+        assertEquals(SkillCatalog.Ids.EXCHANGE_RATE, intent.skillId)
+        assertEquals("USD", intent.params["currency"])
     }
 
     @Test
@@ -69,25 +104,28 @@ class RuleBasedIntentResolverTest {
 
     @Test
     fun `runtime slots match nothing until the device fills them in`() = runBlocking {
-        assertNull(resolver.resolve("takvim aç"))
+        val definition = SkillDefinition(
+            id = "greet_room",
+            description = "test",
+            parameters = listOf(ParamSpec("room", "oda")),
+            utterances = listOf(
+                UtterancePattern(
+                    template = "{oda} selam ver",
+                    slots = listOf(SlotSpec("oda", param = "room", kind = SlotKind.RUNTIME)),
+                ),
+            ),
+        )
 
-        val withApps = SkillCatalog.definitions.map { definition ->
-            if (definition.id != SkillCatalog.Ids.OPEN_APP) {
-                definition
-            } else {
-                definition.copy(
-                    utterances = definition.utterances.map {
-                        it.withSlotValues(
-                            "uygulama",
-                            listOf(dev.alf.domain.SlotValue("takvim", "com.android.calendar")),
-                        )
-                    },
-                )
-            }
-        }
+        assertNull(RuleBasedIntentResolver(listOf(definition)).resolve("mutfak selam ver"))
 
-        val intent = assertNotNull(RuleBasedIntentResolver(withApps).resolve("takvim aç"))
-        assertEquals(SkillCatalog.Ids.OPEN_APP, intent.skillId)
-        assertEquals("com.android.calendar", intent.params["package"])
+        val filled = definition.copy(
+            utterances = definition.utterances.map {
+                it.withSlotValues("oda", listOf(SlotValue("mutfak", "kitchen")))
+            },
+        )
+
+        val intent = assertNotNull(RuleBasedIntentResolver(listOf(filled)).resolve("mutfak selam ver"))
+        assertEquals("greet_room", intent.skillId)
+        assertEquals("kitchen", intent.params["room"])
     }
 }
