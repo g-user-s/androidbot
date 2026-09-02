@@ -89,13 +89,15 @@ yönlendirilir.
 
 ## 5. Mimari
 
-Niyet çözümleme ve yetenek kataloğu **saf Kotlin/JVM** modüllerinde: Android SDK'sı olmadan
-derlenir ve test edilir, testler saniyeler içinde çalışır, emülatör gerekmez.
+Niyet çözümleme, yetenek kataloğu **ve tüm sinyal işleme** saf Kotlin/JVM modüllerinde: Android
+SDK'sı olmadan derlenir ve test edilir, testler saniyeler içinde çalışır, emülatör gerekmez.
+Android'e bağımlı olan tek şey `AudioRecord`; eşleştiricinin kendisi değil.
 
 ```
 domain/assistant     [JVM]      Skill, SkillDefinition, UtterancePattern, Intent, AssistantEngine
 data/nlu             [JVM]      TextNormalizer, RuleBasedIntentResolver, OfflineVocabulary
-data/audio           [Android]  AudioRecord, VAD, MFCC, DTW eşleştirici, TTS, klipler
+data/dsp             [JVM]      FFT, MFCC, DTW, VAD segmentleyici, PhraseMatcher, ConversationListener
+data/audio           [Android]  AudioRecord beslemesi, TTS, şablon üretimi, klipler
 data/llm             [Android]  Anthropic Messages API istemcisi (tool use)
 data/prefs           [Android]  Ayarlar, şifreli API anahtarı
 domain/skills-impl   [Android]  Skill yürütücüleri (alarm, uygulama açma, arama...)
@@ -134,9 +136,14 @@ değişmez.
 katalog, kural tabanlı çözücü (birebir → serbest metin → bulanık eşleştirme), offline sözlük
 üreticisi, `AssistantEngine`. 27 birim testi.
 
-**Faz 2 — Ses boru hattı (en riskli kısım).** AudioRecord + VAD, MFCC + CMVN, DTW eşleştirici,
-TTS ile şablon üretme aracı, uyanma klipleri, foreground service + wake lock + boot receiver,
-`/system/priv-app` kurulum betiği. Çıktı: ekran kapalıyken çalışan uyandırma.
+**Faz 2a — Eşleştirme çekirdeği.** ✅ Tamamlandı. FFT, mel filtre bankası, MFCC + CMVN,
+Sakoe-Chiba bantlı DTW, adaptif gürültü tabanlı VAD segmentleyici (ön-tampon dahil),
+`PhraseMatcher` (mesafe + marj kapıları), iki aşamalı `ConversationListener`, şablon dosya
+biçimi. Tamamı saf Kotlin: sentetik sesle 53 test, cihaz gerekmiyor.
+
+**Faz 2b — Android ses katmanı.** `AudioRecord` beslemesi, TTS ile şablon üretme aracı, uyanma
+klipleri, foreground service + wake lock + boot receiver, `/system/priv-app` kurulum betiği.
+Çıktı: ekran kapalıyken çalışan uyandırma.
 
 **Faz 3 — Android yetenekleri + arayüz.** Skill yürütücüleri, Compose sohbet ekranı, ayarlar,
 runtime slot doldurma (kurulu uygulamalar, rehber).
@@ -147,7 +154,25 @@ tool schema, tool-call döngüsü, şifreli anahtar, çevrimdışında kural tab
 **Faz 5 — Sağlamlaştırma.** Cihazda pil ölçümü, yanlış tetikleme ayarı, ses odağı çakışmaları,
 gece zamanlama kuralı, release imzalama.
 
-## 7. Açık Sorular
+## 7. Eşik Kalibrasyonu
+
+`PhraseMatcher` iki kapı kullanıyor ve ikisi de cihazda ölçülerek ayarlanmalı:
+
+- **`acceptDistance`** — normalize edilmiş DTW mesafesi üst sınırı. Sözlükteki hiçbir şeye
+  benzemeyen sesleri eler.
+- **`minMargin`** — kazanan ile en yakın *farklı* ifade arasındaki fark. İki ifadeye eşit
+  derecede benzeyen sesi, kendinden emin bir yanlış cevaba dönüşmeden eler.
+
+`PhraseMatcher.rank()` sıcak yolda kullanılmaz; tam olarak bu kalibrasyon için var — bir kayıt
+verildiğinde ifade başına en iyi mesafeyi sıralı döndürür. Prosedür: cihazda 50-100 gerçek
+"hey alf" kaydı ve birkaç saatlik oda gürültüsü topla, `rank()` çıktısının iki dağılımını
+ayıran noktayı seç. Ölçülecek sayı: **saatte yanlış tetikleme** (hedef <1) ve **kaçırma oranı**
+(hedef <%5).
+
+Uyandırma sözlüğü tek ifade olduğu için orada `minMargin` işlevsizdir (karşılaştırılacak rakip
+yok); asıl işini komut penceresinde görür.
+
+## 8. Açık Sorular
 
 - `adb shell lshal | grep -i soundtrigger` — boş dönerse DSP yolu kesin kapalı (beklenen).
 - `adb shell getprop ro.product.cpu.abilist` — 32/64 bit, yerel kütüphane ABI'si için gerekli.
