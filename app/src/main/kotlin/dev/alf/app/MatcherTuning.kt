@@ -26,10 +26,12 @@ object MatcherTuning {
     const val COMMAND_MIN_MARGIN = 0.15
 
     /** How long alf stays awake after answering, waiting for a command. */
-    const val COMMAND_WINDOW_MS = 6_000L
+    const val COMMAND_WINDOW_MS = 10_000L
 
     /** Writes the top few distances for every capture to logcat, for threshold calibration. */
-    const val LOG_RANKINGS = true
+    // Enable only while collecting calibration samples. Ranking every phrase roughly doubles
+    // command work and is especially visible on the target tablet's weak CPU.
+    const val LOG_RANKINGS = false
 
     const val RANKINGS_LOGGED = 3
 }

@@ -166,22 +166,36 @@ class AlfService : Service() {
         val diagnostics = PhraseMatcher(templates, acceptDistance = Double.MAX_VALUE)
 
         val segmenter = VoiceSegmenter(vadConfig)
+        var suppressMicrophoneUntilMs = 0L
         setPhase(AlfState.Phase.Listening)
 
         MicrophoneSource(
             sampleRate = vadConfig.sampleRate,
             frameLength = vadConfig.frameLength,
         ).frames().collect { frame ->
+            val nowMs = System.currentTimeMillis()
+            // SoundPool playback is asynchronous. Without this guard Alf records its own wake
+            // response and immediately mistakes "efendim" for the user's command.
+            if (nowMs < suppressMicrophoneUntilMs) {
+                segmenter.reset()
+                return@collect
+            }
+
             val utterance = segmenter.accept(frame)
             if (utterance == null) {
                 // Still lets the command window expire while nobody is speaking.
-                handle(listener.onTick(System.currentTimeMillis()), speech, utterance = null)
+                handle(listener.onTick(nowMs), speech, utterance = null)
                 return@collect
             }
 
             val features = extractor.extract(utterance)
             if (MatcherTuning.LOG_RANKINGS) logRankings(diagnostics, features)
-            handle(listener.onUtterance(features, System.currentTimeMillis()), speech, utterance)
+            val event = listener.onUtterance(features, nowMs)
+            handle(event, speech, utterance)
+            if (event == ListenerEvent.Woke) {
+                segmenter.reset()
+                suppressMicrophoneUntilMs = System.currentTimeMillis() + WAKE_RESPONSE_COOLDOWN_MS
+            }
         }
     }
 
@@ -190,6 +204,7 @@ class AlfService : Service() {
             null -> Unit
 
             ListenerEvent.Woke -> {
+                Log.i(TAG, "wake accepted")
                 setPhase(AlfState.Phase.Awake)
                 // Falls back to speaking when no clip could be cached.
                 if (wakeResponses?.play() != true) {
@@ -203,12 +218,16 @@ class AlfService : Service() {
             }
 
             ListenerEvent.NotUnderstood -> {
+                Log.i(TAG, "command not understood locally; trying model fallback")
                 setPhase(AlfState.Phase.Listening)
                 // The local vocabulary did not have it. Anything beyond that needs the model.
                 if (utterance == null || !askGemini(utterance, speech)) speech.speak(NOT_UNDERSTOOD)
             }
 
-            ListenerEvent.TimedOut -> setPhase(AlfState.Phase.Listening)
+            ListenerEvent.TimedOut -> {
+                Log.i(TAG, "command window timed out")
+                setPhase(AlfState.Phase.Listening)
+            }
         }
     }
 
@@ -407,6 +426,7 @@ class AlfService : Service() {
         private const val CHANNEL_ID = "alf.listening"
         private const val NOTIFICATION_ID = 1
         private const val WAKE_LOCK_TAG = "alf:listening"
+        private const val WAKE_RESPONSE_COOLDOWN_MS = 1_800L
         private const val TEMPLATES_ASSET = "templates.alf"
         private const val NOT_UNDERSTOOD = "Bunu anlayamadım."
         private const val NO_CONNECTION = "Şu an internetim yok."

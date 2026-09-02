@@ -15,7 +15,7 @@ microphone (16 kHz)
    → VAD gate                     nothing downstream runs while the room is quiet
    → MFCC + CMVN → DTW            compared against reference templates
    → "hey alf"?  → wake clip      "efendim" / "buradayım" / "dinliyorum"
-   → command window (6 s)
+   → command window (10 s)
        → local match?  → run the skill                    offline, instant
        → no match + online? → audio to Gemini             one round trip: speech + decision
        → otherwise → "bunu anlayamadım"
